@@ -1,0 +1,18 @@
+FROM eclipse-temurin:21-jdk-alpine
+
+WORKDIR /app
+
+RUN apk add --no-cache bash curl
+
+COPY pom.xml .
+COPY mvnw .
+COPY .mvn .mvn
+
+RUN chmod +x mvnw && \
+    ./mvnw dependency:go-offline -B --no-transfer-progress
+
+EXPOSE 8080
+
+CMD ["./mvnw", "spring-boot:run", \
+     "-Dspring-boot.run.jvmArguments=-Xmx512m", \
+     "--no-transfer-progress"]

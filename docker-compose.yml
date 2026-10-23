@@ -1,0 +1,100 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: betarena_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - betarena_net
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: betarena_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "${PGADMIN_PORT}:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./database/pgadmin-servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - betarena_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: betarena_backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/users/leaderboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}?stringtype=unspecified
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS}
+      SPRING_PROFILES_ACTIVE: dev
+    ports:
+      - "${BACKEND_PORT}:8080"
+    volumes:
+      - ./backend:/app
+      - maven_cache:/root/.m2
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - betarena_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: betarena_frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT}:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - betarena_net
+
+volumes:
+  postgres_data:
+    name: betarena_postgres_data
+  pgadmin_data:
+    name: betarena_pgadmin_data
+  maven_cache:
+    name: betarena_maven_cache
+
+networks:
+  betarena_net:
+    name: betarena_network
+    driver: bridge

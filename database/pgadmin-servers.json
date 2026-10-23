@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name":          "BetArena",
+      "Group":         "Servers",
+      "Host":          "postgres",
+      "Port":          5432,
+      "MaintenanceDB": "betarena",
+      "Username":      "betarena",
+      "SSLMode":       "prefer"
+    }
+  }
+}
